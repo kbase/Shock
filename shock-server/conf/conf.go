@@ -20,6 +20,7 @@ var (
 	// Admin
 	ADMIN_EMAIL = ""
 	ADMIN_USERS = ""
+	AdminUsers  []string
 
 	// Permissions for anonymous user
 	ANON_READ   = true
@@ -44,7 +45,9 @@ var (
 	// Config File
 	CONFIG_FILE = ""
 
-	GOMAXPROCS = ""
+	// Runtime
+	EXPIRE_WAIT = 60 // wait time for reaper in minutes
+	GOMAXPROCS  = ""
 
 	// Logs
 	LOG_PERF   = false // Indicates whether performance logs should be stored
@@ -96,6 +99,11 @@ func Initialize() {
 	// Admin
 	ADMIN_EMAIL, _ = c.String("Admin", "email")
 	ADMIN_USERS, _ = c.String("Admin", "users")
+	if ADMIN_USERS != "" {
+		for _, name := range strings.Split(ADMIN_USERS, ",") {
+			AdminUsers = append(AdminUsers, strings.TrimSpace(name))
+		}
+	}
 
 	// Access-Control
 	ANON_READ, _ = c.Bool("Anonymous", "read")
@@ -120,6 +128,7 @@ func Initialize() {
 	}
 
 	// Runtime
+	EXPIRE_WAIT, _ = c.Int("Runtime", "expire_wait")
 	GOMAXPROCS, _ = c.String("Runtime", "GOMAXPROCS")
 
 	LOG_PERF, _ = c.Bool("Log", "perf_log")
@@ -182,7 +191,7 @@ func Initialize() {
 
 	VERSIONS["ACL"] = 2
 	VERSIONS["Auth"] = 1
-	VERSIONS["Node"] = 2
+	VERSIONS["Node"] = 4
 }
 
 // Bool is a convenience wrapper around strconv.ParseBool

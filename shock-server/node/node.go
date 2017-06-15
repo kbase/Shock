@@ -6,13 +6,15 @@ import (
 	"fmt"
 	e "github.com/MG-RAST/Shock/shock-server/errors"
 	"github.com/MG-RAST/Shock/shock-server/node/acl"
+	"github.com/MG-RAST/Shock/shock-server/node/archive"
 	"github.com/MG-RAST/Shock/shock-server/node/file"
 	"github.com/MG-RAST/Shock/shock-server/node/file/index"
 	"github.com/MG-RAST/Shock/shock-server/user"
 	"github.com/MG-RAST/Shock/shock-server/util"
-	"github.com/MG-RAST/golib/mgo/bson"
+	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -23,14 +25,16 @@ type Node struct {
 	Attributes   interface{}       `bson:"attributes" json:"attributes"`
 	Indexes      Indexes           `bson:"indexes" json:"indexes"`
 	Acl          acl.Acl           `bson:"acl" json:"-"`
-	VersionParts map[string]string `bson:"version_parts" json:"-"`
+	VersionParts map[string]string `bson:"version_parts" json:"version_parts"`
 	Tags         []string          `bson:"tags" json:"tags"`
 	Revisions    []Node            `bson:"revisions" json:"-"`
-	Linkages     []linkage         `bson:"linkage" json:"linkages"`
+	Linkages     []linkage         `bson:"linkage" json:"linkage"`
 	CreatedOn    time.Time         `bson:"created_on" json:"created_on"`
 	LastModified time.Time         `bson:"last_modified" json:"last_modified"`
+	Expiration   time.Time         `bson:"expiration" json:"expiration"` // 0 means no expiration
 	Type         string            `bson:"type" json:"type"`
 	Subset       Subset            `bson:"subset" json:"-"`
+	Parts        *PartsList        `bson:"parts" json:"parts"`
 }
 
 type linkage struct {
@@ -42,10 +46,11 @@ type linkage struct {
 type Indexes map[string]IdxInfo
 
 type IdxInfo struct {
-	Type        string `bson:"index_type" json:"-"`
-	TotalUnits  int64  `bson:"total_units" json:"total_units"`
-	AvgUnitSize int64  `bson:"average_unit_size" json:"average_unit_size"`
-	Format      string `bson:"format" json:"-"`
+	Type        string    `bson:"index_type" json:"-"`
+	TotalUnits  int64     `bson:"total_units" json:"total_units"`
+	AvgUnitSize int64     `bson:"average_unit_size" json:"average_unit_size"`
+	Format      string    `bson:"format" json:"-"`
+	CreatedOn   time.Time `bson:"created_on" json:"created_on"`
 }
 
 type FormFiles map[string]FormFile
@@ -115,30 +120,13 @@ func LoadFromDisk(id string) (n *Node, err error) {
 }
 
 func CreateNodeUpload(u *user.User, params map[string]string, files FormFiles) (node *Node, err error) {
-	for param := range params {
-		if !util.IsValidParamName(param) {
-			return nil, errors.New("invalid param: " + param)
-		}
-		if param == "parts" && params[param] == "close" {
-			return nil, errors.New("Cannot set parts=close when creating a node, did you do a POST when you meant to PUT?")
-		}
-	}
-
-	for file := range files {
-		if !util.IsValidFileName(file) {
-			return nil, errors.New("invalid file param: " + file)
-		}
-	}
-
 	// if copying node or creating subset node from parent, check if user has rights to the original node
-
 	if _, hasCopyData := params["copy_data"]; hasCopyData {
 		_, err = Load(params["copy_data"])
 		if err != nil {
 			return
 		}
 	}
-
 	if _, hasParentNode := params["parent_node"]; hasParentNode {
 		_, err = Load(params["parent_node"])
 		if err != nil {
@@ -159,10 +147,99 @@ func CreateNodeUpload(u *user.User, params map[string]string, files FormFiles) (
 
 	err = node.Update(params, files)
 	if err != nil {
+		node.Rmdir()
 		return
 	}
 
 	err = node.Save()
+	return
+}
+
+func CreateNodesFromArchive(u *user.User, params map[string]string, files FormFiles, archiveId string) (nodes []*Node, err error) {
+	// get parent node
+	archiveNode, err := Load(archiveId)
+	if err != nil {
+		return nil, err
+	}
+	if archiveNode.File.Size == 0 {
+		return nil, errors.New("parent archive node has no file")
+	}
+
+	// get format
+	aFormat, hasFormat := params["archive_format"]
+	if !hasFormat {
+		return nil, errors.New("missing archive_format parameter. use one of: " + archive.ArchiveList)
+	}
+	if !archive.IsValidArchive(aFormat) {
+		return nil, errors.New("invalid archive_format parameter. use one of: " + archive.ArchiveList)
+	}
+
+	// get attributes
+	var atttributes interface{}
+	if attrFile, ok := files["attributes"]; ok {
+		defer attrFile.Remove()
+		attr, err := ioutil.ReadFile(attrFile.Path)
+		if err != nil {
+			return nil, err
+		}
+		if err = json.Unmarshal(attr, &atttributes); err != nil {
+			return nil, err
+		}
+	} else if attrStr, ok := params["attributes_str"]; ok {
+		if err = json.Unmarshal([]byte(attrStr), &atttributes); err != nil {
+			return nil, err
+		}
+	}
+
+	// get files / delete unpack dir when done
+	fileList, unpackDir, err := archive.FilesFromArchive(aFormat, archiveNode.FilePath())
+	defer os.RemoveAll(unpackDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// preserve acls
+	_, preserveAcls := params["preserve_acls"]
+
+	// build nodes
+	var tempNodes []*Node
+	for _, file := range fileList {
+		// create link
+		link := linkage{Type: "parent", Operation: aFormat, Ids: []string{archiveId}}
+		// create and populate node
+		node := New()
+		node.Type = "basic"
+		node.Linkages = append(node.Linkages, link)
+		node.Attributes = atttributes
+
+		if preserveAcls {
+			// copy over acls from parent node
+			node.Acl = archiveNode.Acl
+		}
+		// this user needs to be owner of new nodes
+		node.Acl.SetOwner(u.Uuid)
+		node.Acl.Set(u.Uuid, acl.Rights{"read": true, "write": true, "delete": true})
+
+		if err = node.Mkdir(); err != nil {
+			return nil, err
+		}
+		// set file
+		f := FormFile{Name: file.Name, Path: file.Path, Checksum: file.Checksum}
+		if err = node.SetFile(f); err != nil {
+			node.Rmdir()
+			return nil, err
+		}
+		tempNodes = append(tempNodes, node)
+	}
+
+	// save nodes, only return those that were created / saved
+	for _, n := range tempNodes {
+		if err = n.Save(); err != nil {
+			n.Rmdir()
+			return nil, err
+		}
+		nodes = append(nodes, n)
+	}
 	return
 }
 
@@ -269,7 +346,45 @@ func (node *Node) SetFileFormat(format string) (err error) {
 	return
 }
 
+func (node *Node) SetExpiration(expire string) (err error) {
+	parts := ExpireRegex.FindStringSubmatch(expire)
+	if len(parts) == 0 {
+		return errors.New("expiration format is invalid")
+	}
+	var expireTime time.Duration
+	expireNum, _ := strconv.Atoi(parts[1])
+	currTime := time.Now()
+
+	switch parts[2] {
+	case "M":
+		expireTime = time.Duration(expireNum) * time.Minute
+	case "H":
+		expireTime = time.Duration(expireNum) * time.Hour
+	case "D":
+		expireTime = time.Duration(expireNum*24) * time.Hour
+	}
+
+	node.Expiration = currTime.Add(expireTime)
+	err = node.Save()
+	return
+}
+
+func (node *Node) RemoveExpiration() (err error) {
+	// reset to empty time
+	node.Expiration = time.Time{}
+	err = node.Save()
+	return
+}
+
+func (node *Node) ClearRevisions() (err error) {
+	// empty the revisions array
+	node.Revisions = nil
+	err = node.Save()
+	return
+}
+
 func (node *Node) SetAttributes(attr FormFile) (err error) {
+	defer attr.Remove()
 	attributes, err := ioutil.ReadFile(attr.Path)
 	if err != nil {
 		return

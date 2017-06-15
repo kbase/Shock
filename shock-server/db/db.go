@@ -5,17 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"github.com/MG-RAST/Shock/shock-server/conf"
-	"github.com/MG-RAST/golib/mgo"
+	mgo "gopkg.in/mgo.v2"
 	"time"
 )
 
 const (
-	DbTimeout = time.Duration(time.Second * 1200)
+	DbTimeout    = time.Duration(time.Second * 1200)
+	DialTimeout  = time.Duration(time.Second * 10)
+	DialAttempts = 3
 )
 
-var (
-	Connection connection
-)
+var Connection connection
 
 type connection struct {
 	dbname   string
@@ -27,10 +27,25 @@ type connection struct {
 
 func Initialize() (err error) {
 	c := connection{}
+
+	// test connection
+	canDial := false
+	for i := 0; i < DialAttempts; i++ {
+		s, err := mgo.DialWithTimeout(conf.MONGODB_HOSTS, DialTimeout)
+		if err == nil {
+			s.Close()
+			canDial = true
+			break
+		}
+	}
+	if !canDial {
+		return errors.New(fmt.Sprintf("no reachable mongodb server(s) at %s", conf.MONGODB_HOSTS))
+	}
+
+	// get handle
 	s, err := mgo.DialWithTimeout(conf.MONGODB_HOSTS, DbTimeout)
 	if err != nil {
-		e := errors.New(fmt.Sprintf("no reachable mongodb server(s) at %s", conf.MONGODB_HOSTS))
-		return e
+		return errors.New(fmt.Sprintf("no reachable mongodb server(s) at %s", conf.MONGODB_HOSTS))
 	}
 	c.Session = s
 	c.DB = c.Session.DB(conf.MONGODB_DATABASE)

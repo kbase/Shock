@@ -1,8 +1,6 @@
 package request
 
 import (
-	"compress/bzip2"
-	"compress/gzip"
 	"crypto/md5"
 	"errors"
 	"fmt"
@@ -11,17 +9,23 @@ import (
 	e "github.com/MG-RAST/Shock/shock-server/errors"
 	"github.com/MG-RAST/Shock/shock-server/logger"
 	"github.com/MG-RAST/Shock/shock-server/node"
+	"github.com/MG-RAST/Shock/shock-server/node/archive"
 	"github.com/MG-RAST/Shock/shock-server/responder"
 	"github.com/MG-RAST/Shock/shock-server/user"
 	"github.com/MG-RAST/Shock/shock-server/util"
+	"github.com/MG-RAST/golib/httpclient"
 	"github.com/MG-RAST/golib/stretchr/goweb/context"
+	"github.com/jum/tinyftp"
 	"hash"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type checkSumCom struct {
@@ -105,7 +109,8 @@ func ParseMultipartForm(r *http.Request) (params map[string]string, files node.F
 	tmpPath := ""
 	for {
 		if part, err := reader.NextPart(); err == nil {
-			// params don't have a FileName() and files must have FormName() of either "upload", "attributes", or an integer
+			// params don't have a FileName()
+			// files must have FormName() of either "upload", "gzip", "bzip2", "attributes", "subset_indices", or an integer
 			if part.FileName() == "" {
 				if !util.IsValidParamName(part.FormName()) {
 					return nil, files, errors.New("invalid param: " + part.FormName())
@@ -115,44 +120,74 @@ func ParseMultipartForm(r *http.Request) (params map[string]string, files node.F
 				if n == 0 || err != nil {
 					break
 				}
-				params[part.FormName()] = fmt.Sprintf("%s", buffer[0:n])
+				formValue := fmt.Sprintf("%s", buffer[0:n])
+				if part.FormName() == "upload_url" {
+					tmpPath = fmt.Sprintf("%s/temp/%d%d", conf.PATH_DATA, rand.Int(), rand.Int())
+					files[part.FormName()] = node.FormFile{Name: "", Path: tmpPath, Checksum: make(map[string]string)}
+					// download from url
+					if tmpFile, err := os.Create(tmpPath); err == nil {
+						defer tmpFile.Close()
+						var tmpform = files[part.FormName()]
+						md5h := md5.New()
+						dst := io.MultiWriter(tmpFile, md5h)
+						fileName, body, err := fetchFileStream(formValue)
+						if err != nil {
+							return nil, files, errors.New("unable to stream url: " + err.Error())
+						}
+						defer body.Close()
+						if _, err = io.Copy(dst, body); err != nil {
+							return nil, files, err
+						}
+						tmpform.Name = fileName
+						tmpform.Checksum["md5"] = fmt.Sprintf("%x", md5h.Sum(nil))
+						files[part.FormName()] = tmpform
+					} else {
+						return nil, files, err
+					}
+				} else {
+					// regular form field
+					params[part.FormName()] = formValue
+				}
 			} else {
-				if _, er := strconv.Atoi(part.FormName()); er != nil && !util.IsValidFileName(part.FormName()) {
+				// determine file type
+				isSubsetFile := false
+				if part.FormName() == "subset_indices" {
+					isSubsetFile = true
+				}
+				isPartsFile := false
+				if _, er := strconv.Atoi(part.FormName()); er == nil {
+					isPartsFile = true
+				}
+				if !isPartsFile && !util.IsValidFileName(part.FormName()) {
 					return nil, files, errors.New("invalid file param: " + part.FormName())
 				}
+				// download it
 				tmpPath = fmt.Sprintf("%s/temp/%d%d", conf.PATH_DATA, rand.Int(), rand.Int())
 				files[part.FormName()] = node.FormFile{Name: part.FileName(), Path: tmpPath, Checksum: make(map[string]string)}
 				if tmpFile, err := os.Create(tmpPath); err == nil {
 					defer tmpFile.Close()
-					if util.IsValidUploadFile(part.FormName()) {
+					if util.IsValidUploadFile(part.FormName()) || isPartsFile || isSubsetFile {
+						// handle upload or parts files
+						var tmpform = files[part.FormName()]
 						md5h := md5.New()
 						dst := io.MultiWriter(tmpFile, md5h)
-						var tmpform = files[part.FormName()]
-						if part.FormName() == "upload" {
-							if _, err = io.Copy(dst, part); err != nil {
-								return nil, files, err
-							}
-						} else if part.FormName() == "gzip" {
-							g, gerr := gzip.NewReader(part)
-							if gerr != nil {
-								return nil, files, gerr
-							}
-							defer g.Close()
-							if _, err = io.Copy(dst, g); err != nil {
-								return nil, files, err
-							}
-							tmpform.Name = g.Header.Name
-						} else if part.FormName() == "bzip2" {
-							b := bzip2.NewReader(part)
-							if _, err = io.Copy(dst, b); err != nil {
-								return nil, files, err
-							}
+						ucReader, ucErr := archive.UncompressReader(part.FormName(), part)
+						if ucErr != nil {
+							return nil, files, ucErr
+						}
+						if _, err = io.Copy(dst, ucReader); err != nil {
+							return nil, files, err
+						}
+						if archive.IsValidUncompress(part.FormName()) {
 							tmpform.Name = util.StripSuffix(part.FileName())
 						}
 						tmpform.Checksum["md5"] = fmt.Sprintf("%x", md5h.Sum(nil))
 						files[part.FormName()] = tmpform
 					} else {
-						io.Copy(tmpFile, part)
+						// handle file where md5 not needed
+						if _, err = io.Copy(tmpFile, part); err != nil {
+							return nil, files, err
+						}
 					}
 				} else {
 					return nil, files, err
@@ -164,14 +199,50 @@ func ParseMultipartForm(r *http.Request) (params map[string]string, files node.F
 			break
 		}
 	}
-
-	_, hasUpload := files["upload"]
-	_, hasCopyData := params["copy_data"]
-	if hasUpload && hasCopyData {
-		err = errors.New("Cannot specify upload file path and copy_data node in same request.")
-		return nil, files, err
-	}
 	return
+}
+
+func fetchFileStream(urlStr string) (f string, r io.ReadCloser, err error) {
+	u, _ := url.Parse(urlStr)
+	if (u.Scheme == "") || (u.Host == "") || (u.Path == "") {
+		return "", nil, errors.New("Not a valid url: " + urlStr)
+	}
+	pathParts := strings.Split(strings.TrimRight(u.Path, "/"), "/")
+	fileName := pathParts[len(pathParts)-1]
+	cleanPath := strings.Join(pathParts, "/")
+
+	if (u.Scheme == "http") || (u.Scheme == "https") {
+		res, err := httpclient.Get(u.String(), httpclient.Header{}, nil, nil)
+		if err != nil {
+			return "", nil, errors.New("httpclient returned: " + err.Error())
+		}
+		if res.StatusCode != 200 { //err in fetching data
+			resbody, _ := ioutil.ReadAll(res.Body)
+			return "", nil, errors.New(fmt.Sprintf("url=%s, res=%s", u.String(), resbody))
+		}
+		return fileName, res.Body, err
+	} else if u.Scheme == "ftp" {
+		// set port if missing
+		ftpHost := u.Host
+		hostParts := strings.Split(u.Host, ":")
+		if len(hostParts) == 1 {
+			ftpHost = u.Host + ":21"
+		}
+		c, _, _, err := tinyftp.Dial("tcp", ftpHost)
+		if err != nil {
+			return "", nil, errors.New("ftpclient returned: " + err.Error())
+		}
+		defer c.Close()
+		if _, _, err = c.Login("", ""); err != nil {
+			return "", nil, errors.New("ftpclient returned: " + err.Error())
+		}
+		dconn, _, _, err := c.RetrieveFrom(cleanPath)
+		if err != nil {
+			return "", nil, errors.New("ftpclient returned: " + err.Error())
+		}
+		return fileName, dconn, err
+	}
+	return "", nil, errors.New("unsupported protocol scheme: " + u.Scheme)
 }
 
 func writeChecksum(f func() hash.Hash, c chan checkSumCom) {

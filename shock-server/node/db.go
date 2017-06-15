@@ -4,12 +4,15 @@ import (
 	"errors"
 	"github.com/MG-RAST/Shock/shock-server/conf"
 	"github.com/MG-RAST/Shock/shock-server/db"
-	"github.com/MG-RAST/golib/mgo"
-	"github.com/MG-RAST/golib/mgo/bson"
+	mgo "gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
 )
+
+// mongodb has hard limit of 16 MB docuemnt size
+var DocumentMaxByte = 16777216
 
 // Initialize creates a copy of the mongodb connection and then uses that connection to
 // create the Nodes collection in mongodb. Then, it ensures that there is a unique index
@@ -23,6 +26,7 @@ func Initialize() {
 	c.EnsureIndex(mgo.Index{Key: []string{"acl.write"}, Background: true})
 	c.EnsureIndex(mgo.Index{Key: []string{"acl.delete"}, Background: true})
 	c.EnsureIndex(mgo.Index{Key: []string{"created_on"}, Background: true})
+	c.EnsureIndex(mgo.Index{Key: []string{"expiration"}, Background: true})
 	c.EnsureIndex(mgo.Index{Key: []string{"file.path"}, Background: true})
 	c.EnsureIndex(mgo.Index{Key: []string{"file.virtual_parts"}, Background: true})
 	c.EnsureIndex(mgo.Index{Key: []string{"id"}, Unique: true})
@@ -32,6 +36,15 @@ func Initialize() {
 			c.EnsureIndex(mgo.Index{Key: []string{v}, Background: true})
 		}
 	}
+}
+
+func HasAttributeField(a string) bool {
+	for _, b := range strings.Split(conf.MONGODB_ATTRIBUTE_INDEXES, ",") {
+		if a == strings.TrimSpace(b) {
+			return true
+		}
+	}
+	return false
 }
 
 func dbDelete(q bson.M) (err error) {
@@ -70,6 +83,14 @@ func dbFind(q bson.M, results *Nodes, order string, options map[string]int) (cou
 		}
 	}
 	err = c.Find(q).Sort(order).All(results)
+	return
+}
+
+func DbFindDistinct(q bson.M, d string) (results interface{}, err error) {
+	session := db.Connection.Session.Copy()
+	defer session.Close()
+	c := session.DB(conf.MONGODB_DATABASE).C("Nodes")
+	err = c.Find(q).Distinct("attributes."+d, &results)
 	return
 }
 
