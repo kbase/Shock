@@ -55,3 +55,6 @@ docs:
 
 clean:
 	rm -rf $(GOPATH)/src/github.com/MG-RAST/Shock $(GOPATH)/bin/shock-server $(GOPATH)/bin/shock-client
+
+docker_image:
+	IMAGE_NAME=kb_shock hooks/build

@@ -1,0 +1,12 @@
+version: "3"
+services:
+  shock:
+    image: kb_shock
+    depends_on:
+      - "mongo"
+    ports:
+      - "7044:7044"
+  mongo:
+    image: mongo:2
+    ports:
+      - "27017:27017"
