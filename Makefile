@@ -58,3 +58,10 @@ clean:
 
 docker_image:
 	IMAGE_NAME=kb_shock hooks/build
+
+docker_image_test:
+	docker-compose up -d mongo
+	sleep 30
+	docker-compose up mongoinit
+	docker-compose up -d shock
+
