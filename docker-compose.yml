@@ -1,0 +1,16 @@
+version: "3"
+services:
+  shock:
+    image: kb_shock
+    ports:
+      - "7044:7044"
+  mongoinit:
+    image: mongo:2
+    volumes:
+      - ./shock.mongodump:/mnt/shock.mongodump
+    entrypoint: [ "mongorestore", "--host", "mongo", "/mnt/shock.mongodump"]
+    depends_on: [ "mongo" ]
+  mongo:
+    image: mongo:2
+    ports:
+      - "27017:27017"
