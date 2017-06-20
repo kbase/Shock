@@ -7,6 +7,7 @@ services:
 
 before_install:
   - docker pull bitnami/minideb:jessie
+  - docker pull kbase/kb_go:latest
 
 script:
   - make docker_image
