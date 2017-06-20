@@ -1,7 +1,7 @@
 version: "3"
 services:
   shock:
-    image: kb_shock
+    image: kbase/kb_shock
     ports:
       - "7044:7044"
   mongoinit:
