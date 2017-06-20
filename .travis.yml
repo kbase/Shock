@@ -15,7 +15,7 @@ after_success:
   - export REPO=kbase/kb_shock
   - export TAG=`if [ "$TRAVIS_BRANCH" == "master" ]; then echo "latest"; else echo $TRAVIS_BRANCH ; fi`
   - docker tag $REPO:$TRAVIS_COMMIT $REPO:$TAG
-  - if [ "$TAG" == "master" ] || [ "$TAG" == "develop"] ; then docker push $REPO:$TAG fi
+  - if [ "$TAG" == "master" ] || [ "$TAG" == "develop" ] ; then docker push $REPO:$TAG ; fi
 
 env:
   global:
