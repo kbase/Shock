@@ -20,7 +20,7 @@ popd
 cp Shock/Makefile $GOPATH
 cd $GOPATH
 make version
-cd $GOPATH/src/github.com/MG-RAST/Shock/shock-server  && \
-go build  && \
-cp shock-server /kb/deployment/bin/ && \
+cd $GOPATH/src/github.com/MG-RAST/Shock/shock-server
+go build
+cp shock-server /kb/deployment/bin/
 echo Shock server binary copied to /kb/deployment/bin
