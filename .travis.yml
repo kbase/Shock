@@ -9,6 +9,9 @@ before_install:
   - docker pull bitnami/minideb:jessie
   - docker pull kbase/kb_go:latest
 
+before_script:
+  - sudo apt-get update && sudo apt-get install git
+
 script:
   - make docker_image
 
