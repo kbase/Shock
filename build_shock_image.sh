@@ -5,4 +5,4 @@
 	docker build --build-arg BUILD_DATE=$DATE \
      		     --build-arg VCS_REF=$COMMIT \
 				 --build-arg BRANCH=$BRANCH \
-             	 -t kb_shock .
+             	 -t kbase/kb_shock .
