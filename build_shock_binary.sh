@@ -4,6 +4,10 @@
 # Build the Shock executable and copy it into the /kb/deployment/bin directory
 # This script expects that the environment variable COMMIT be a git commit hash
 # that represents the commit within the Shock repo to build
+# ___NOTE___ because the commit hash is generated from the local repo,
+# but this script pulls from github, you must push your current repo to
+# github before the $COMMIT hash passed into this script is valid
+# 
 
 export GOPATH=/tmp/goroot
 DEST=`pwd`
