@@ -20,7 +20,7 @@ if [ "$1" ] ; then
         TMPDIR=/tmp/data$$
         mkdir $TMPDIR
         pushd $TMPDIR
-        /usr/local/bin/http --verify=no --download $1 || exit 1
+        http --verify=no --download $1 || exit 1
         popd
         DATA_SRC=$TMPDIR/*
     fi
@@ -35,7 +35,7 @@ if [ "$2" ] ; then
         TMPDIR2=/tmp/template$$
         mkdir $TMPDIR2
         pushd $TMPDIR2
-        /usr/local/bin/http --verify=no --download $2 || exit 1
+        http --verify=no --download $2 || exit 1
         popd
         TEMPLATE=$TMPDIR/*
     fi
