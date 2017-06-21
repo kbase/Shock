@@ -3,7 +3,7 @@ sudo: required
 services:
   - docker
 before_install:
-  - docker pull kbase/minideb:jessie
+  - docker pull kbase/kb_minideb:jessie
   - docker pull kbase/kb_go:latest
 before_script:
   - sudo apt-get update && sudo apt-get install git
