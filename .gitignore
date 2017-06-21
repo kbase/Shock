@@ -3,7 +3,6 @@
 # ignore all generated files
 common
 common/**/*
-deployment/bin/shock-server
 
 # ignore files with # and ~
 *\#*

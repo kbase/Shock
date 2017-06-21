@@ -1,0 +1,58 @@
+#
+# This file is a jinja2 template file configured with reasonable defaults for
+# a simplistic wide open service running in a docker-compose environment. The
+# values will be configured via an entrypoint script that consumes the data values
+# from elsewhere, or else just uses these defaults
+#
+# The data source should name the values identically to the names here
+#
+[Address]
+# IP and port for api
+# Note: use of port 80 may require root access
+# 0.0.0.0 will bind Shock to all IP's
+api-ip={{ Address_api_ip|default('0.0.0.0') }}
+api-port={{ Address_api_port|default(7044) }}
+
+[Admin]
+email=sysadmins@kbase.us
+users={{ admin_users|default('ciservices') }}
+
+[Anonymous]
+# Controls an anonymous user's ability to read/write
+# values: true/false
+read={{ Anonymous_read |default('true') }}
+write={{ Anonymous_write |default('true') }}
+create-user={{ Anonymous_create_user |default('true') }}
+
+[Auth]
+
+
+[External]
+api-url= {{ External_api_url|default('') }}
+
+[Log]
+perf_log=false
+
+[Mongodb]
+# Mongodb configuration
+# Hostnames and ports hosts=host1[,host2:port,...,hostN]
+hosts={{ Mongodb_hosts|default('mongo') }}
+database={{ Mongodb_database|default('shock') }}
+user={{ Mongodb_user|default('') }}
+password={{ Mongodb_password|default('') }}
+gomaxprocs=4{{ Mongodb_gomaxprocs|default(4) }}
+
+[Mongodb-Node-Indices]
+# See http://www.mongodb.org/display/DOCS/Indexes#Indexes-CreationOptions for more info on mongodb index options.
+# key=unique:true/false[,dropDups:true/false][,sparse:true/false]
+id=unique:true
+
+[Paths]
+# See documentation for details of deploying Shock
+site={{ Paths_site|default('/mnt/shock/site') }}
+data={{ Paths_data|default('/mnt/shock/data') }}
+logs={{ Paths_logs|default('/mnt/shock/logs') }}
+local_paths=
+pidfile=
+
+[Runtime]
