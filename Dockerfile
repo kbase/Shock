@@ -10,8 +10,7 @@ ARG BRANCH=develop
 RUN mkdir -p /kb/deployment/bin /kb/deployment/conf && \
     mkdir -p /mnt/shock/site /mnt/shock/data /mnt/shock/logs
 
-COPY shock-server.cfg /kb/deployment/conf
-COPY deployment/bin/shock-server /kb/deployment/bin/
+COPY deployment/ /kb/deployment/
 
 # The BUILD_DATE value seem to bust the docker cache when the timestamp changes, move to
 # the end
@@ -21,4 +20,3 @@ LABEL org.label-schema.build-date=$BUILD_DATE \
       org.label-schema.schema-version="1.0.0-rc1" \
       us.kbase.vcs-branch=$BRANCH
 
-ENTRYPOINT [ "/kb/deployment/bin/shock-server", "--conf", "/kb/deployment/conf/shock-server.cfg" ]
