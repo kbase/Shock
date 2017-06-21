@@ -20,3 +20,4 @@ LABEL org.label-schema.build-date=$BUILD_DATE \
       org.label-schema.schema-version="1.0.0-rc1" \
       us.kbase.vcs-branch=$BRANCH
 
+ENTRYPOINT ['/kb/deployment/bin/entrypoint.sh']
