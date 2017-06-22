@@ -42,4 +42,4 @@ if [ "$2" ] ; then
 fi
 
 /usr/local/bin/j2 $TEMPLATE $DATA_SRC > $DIR/../conf/shock-server.cfg && \
-echo $DIR/shock-server --conf $DIR/../conf/shock-server.cfg
+$DIR/shock-server --conf $DIR/../conf/shock-server.cfg

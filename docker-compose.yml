@@ -1,7 +1,7 @@
 version: "3"
 services:
   shock:
-    image: kbase/kb_shock
+    image: kbase/kb_shock:${TRAVIS_BRANCH:-latest}
     ports:
       - "7044:7044"
   mongoinit:
