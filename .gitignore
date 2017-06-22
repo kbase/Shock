@@ -31,5 +31,5 @@ bin
 # Thumbnails
 ._*
 
-# Ignore any file that has the extension secret
-*.secret
+# Ignore anything in the secrets dir
+secret/*
