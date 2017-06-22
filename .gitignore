@@ -30,3 +30,6 @@ bin
 
 # Thumbnails
 ._*
+
+# Ignore any file that has the extension secret
+*.secret
