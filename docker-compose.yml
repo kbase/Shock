@@ -1,4 +1,4 @@
-version: "3"
+version: "3.1"
 services:
   shock:
     image: kbase/kb_shock:${TRAVIS_BRANCH:-latest}
@@ -14,3 +14,8 @@ services:
     image: mongo:2
     ports:
       - "27017:27017"
+secrets:
+  auth_data:
+    file: ./secrets/auth_data
+  auth_template:
+    file: ./secrets/auth_template

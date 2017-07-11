@@ -1,6 +1,6 @@
 # creates statically compiled shock-server binary: /go/bin/shock-server
 
-FROM kbase/kb_minideb:jessie
+FROM kbase/kb_minideb:stretch
 MAINTAINER Steve Chan sychan@lbl.gov
 
 ARG BUILD_DATE

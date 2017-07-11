@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 #
 # This entrypoint script defaults to using environment variables to populate
 # a jinja2 config template and writing out the config before starting the service
@@ -18,6 +18,13 @@
 # doesn't require them
 #
 
+# Define an error exit function
+function error_exit
+{
+	echo "$1" 1>&2
+	exit 1
+}
+
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # Default config template
 TEMPLATE=$DIR/../conf/.templates/shock-server.cfg.j2
@@ -25,6 +32,7 @@ TEMPLATE=$DIR/../conf/.templates/shock-server.cfg.j2
 # Default data source is empty, resulting in env variables being used
 DATA_SRC=""
 
+# Set empty default values for the auth headers
 AUTH_DATA=""
 AUTH_TEMPLATE=""
 
@@ -43,11 +51,10 @@ if [ "$1" ] ; then
     else
         TMPDIR=/tmp/data$$
         mkdir $TMPDIR
-        pushd $TMPDIR
         # Fetch the file, and have it error out on any redirects to avoid a 200 response
         # that is just a redirect to a login screen
-        http --follow --max-redirects=0 --verify=no --download $1 $AUTH_DATA || exit 1
-        popd
+        wget -q -nd --max-redirect=0 --no-check-certificate --header="${AUTH_DATA}" -P $TMPDIR $1  || \
+            error_exit "Error fetching $1"
         DATA_SRC=$TMPDIR/*
     fi
 fi
@@ -61,7 +68,8 @@ if [ "$2" ] ; then
         TMPDIR2=/tmp/template$$
         mkdir $TMPDIR2
         pushd $TMPDIR2
-        http --follow --max-redirects=0 --verify=no --download $2 $AUTH_TEMPLATE || exit 1
+        wget -q -nd --max-redirect=0 --no-check-certificate --header="${AUTH_TEMPLATE}" -P $TMPDIR2 $2 || \
+            error_exit "Error fetching $2"
         popd
         TEMPLATE=$TMPDIR2/*
     fi
