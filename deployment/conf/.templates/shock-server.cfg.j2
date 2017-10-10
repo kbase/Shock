@@ -25,7 +25,12 @@ write={{ Anonymous_write |default('true') }}
 create-user={{ Anonymous_create_user |default('true') }}
 
 [Auth]
-
+{% if Auth_globus_token_url is defined %}
+globus_token_url={{ Auth_globus_token_url }}
+{% endif %}
+{% if Auth_globus_profile_url is defined %}
+globus_profile_url={{ Auth_globus_profile_url }}
+{% endif %}
 
 [External]
 api-url= {{ External_api_url|default('') }}
