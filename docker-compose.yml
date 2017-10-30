@@ -5,6 +5,10 @@ services:
     command:
       - "-template"
       - "/kb/deployment/conf/.templates/shock-server.cfg.templ:/kb/deployment/conf/shock-server.cfg"
+      - "-wait"
+      - "tcp://mongo:27017"
+      - "timeout"
+      - "300"
       - "/kb/deployment/bin/shock-server"
       - "--conf"
       - "/kb/deployment/conf/shock-server.cfg"
