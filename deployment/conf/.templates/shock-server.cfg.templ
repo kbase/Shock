@@ -1,0 +1,63 @@
+#
+# This file is a jinja2 template file configured with reasonable defaults for
+# a simplistic wide open service running in a docker-compose environment. The
+# values will be configured via an entrypoint script that consumes the data values
+# from elsewhere, or else just uses these defaults
+#
+# The data source should name the values identically to the names here
+#
+[Address]
+# IP and port for api
+# Note: use of port 80 may require root access
+# 0.0.0.0 will bind Shock to all IP's
+api-ip={{ default .Env.Address_api_ip "0.0.0.0" }} 
+api-port={{ default .Env.Address_api_port "7044" }} 
+
+[Admin]
+email=sysadmins@kbase.us
+users={{ default .Env.Admin_users "ciservices" }} 
+
+[Anonymous]
+# Controls an anonymous user's ability to read/write
+# values: true/false
+read={{ default .Env.Anonymous_read  "true" }} 
+write={{ default .Env.Anonymous_write  "true" }} 
+create-user={{ default .Env.Anonymous_create_user  "true" }} 
+
+[Auth]
+{{ if .Env.Auth_globus_token_url -}}
+globus_token_url={{ default .Env.Auth_globus_token_url "" }}
+{{ end }}
+{{ if .Env.Auth_globus_profile_url -}}
+globus_profile_url={{ default .Env.Auth_globus_profile_url "" }}
+{{ end }}
+
+[External]
+api-url= {{ default .Env.External_api_url "" }} 
+
+[Log]
+perf_log=false
+
+[Mongodb]
+# Mongodb configuration
+# Hostnames and ports hosts=host1[,host2:port,...,hostN]
+hosts={{ default .Env.Mongodb_hosts "mongo" }} 
+database={{ default .Env.Mongodb_database "shock" }} 
+user={{ default .Env.Mongodb_user "" }} 
+password={{ default .Env.Mongodb_password "" }} 
+gomaxprocs={{ default .Env.Mongodb_gomaxprocs "4" }} 
+
+[Mongodb-Node-Indices]
+# See http://www.mongodb.org/display/DOCS/Indexes#Indexes-CreationOptions for more info on mongodb index options.
+# key=unique:true/false[,dropDups:true/false][,sparse:true/false]
+id=unique:true
+
+[Paths]
+# See documentation for details of deploying Shock
+site={{ default .Env.Paths_site "/mnt/shock/site" }} 
+data={{ default .Env.Paths_data "/mnt/shock/data" }} 
+logs={{ default .Env.Paths_logs "/mnt/shock/logs" }} 
+local_paths=
+pidfile=
+
+[Runtime]
