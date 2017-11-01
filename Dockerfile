@@ -1,7 +1,6 @@
 # creates statically compiled shock-server binary: /go/bin/shock-server
 
 FROM kbase/kb_minideb:stretch
-MAINTAINER Steve Chan sychan@lbl.gov
 
 ARG BUILD_DATE
 ARG VCS_REF
@@ -18,6 +17,9 @@ LABEL org.label-schema.build-date=$BUILD_DATE \
       org.label-schema.vcs-url="https://github.com/kbase/Shock.git" \
       org.label-schema.vcs-ref=$VCS_REF \
       org.label-schema.schema-version="1.0.0-rc1" \
-      us.kbase.vcs-branch=$BRANCH
+      us.kbase.vcs-branch=$BRANCH \
+      maintainer="Steve Chan sychan@lbl.gov"
 
-ENTRYPOINT [ "/kb/deployment/bin/entrypoint.sh" ]
+ENTRYPOINT [ "/kb/deployment/bin/dockerize"]
+CMD [  "-template", "/kb/deployment/conf/.templates/shock-server.cfg.templ:/kb/deployment/conf/shock-server.cfg", \
+       "/kb/deployment/bin/shock-server", "--conf", "/kb/deployment/conf/shock-server.cfg" ]
