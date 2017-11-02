@@ -1,7 +1,8 @@
-# Shock Mini container image
-## This branch has a makefile that builds a special small footprint container image for
-## running Shock. It is not compatible with Dockerhub automated builds, and requires
-## an actual CI environment that can execute a makefile properly
+# Shock Mini container image #
+
+This branch has a makefile that builds a special small footprint container image for
+running Shock. It is not compatible with Dockerhub automated builds, and requires
+an actual CI environment that can execute a makefile properly
 
 About
 -----
