@@ -55,3 +55,13 @@ docs:
 
 clean:
 	rm -rf $(GOPATH)/src/github.com/MG-RAST/Shock $(GOPATH)/bin/shock-server $(GOPATH)/bin/shock-client
+
+docker_image:
+	./build_shock_image.sh
+
+docker_image_test:
+	docker-compose up -d mongo
+	sleep 30
+	docker-compose up mongoinit
+	docker-compose up -d shock
+

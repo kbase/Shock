@@ -30,3 +30,6 @@ bin
 
 # Thumbnails
 ._*
+
+# Ignore anything in the secrets dir
+secret/*

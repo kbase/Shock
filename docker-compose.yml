@@ -1,0 +1,43 @@
+version: "3.1"
+services:
+  shock:
+    image: kbase/kb_shock:${TRAVIS_BRANCH:-latest}
+    command:
+      - "-template"
+      - "/kb/deployment/conf/.templates/shock-server.cfg.templ:/kb/deployment/conf/shock-server.cfg"
+      - "-wait"
+      - "tcp://mongo:27017"
+      - "-wait"
+      - "tcp://mongoinit:8080"
+      - "-timeout"
+      - "150s"
+      - "/kb/deployment/bin/shock-server"
+      - "--conf"
+      - "/kb/deployment/conf/shock-server.cfg"
+    ports:
+      - "7044:7044"
+    depends_on: ['mongoinit',"mongo"]
+  mongoinit:
+    image: kbase/db_initialize:latest
+    volumes:
+      - ./shock.mongodump:/mnt/shock.mongodump
+    entrypoint:
+      - "/kb/deployment/bin/dockerize.sh"
+      - "-wait"
+      - "tcp://mongo:27017"
+      - "-timeout"
+      - "120s"
+      - "mongorestore"
+      - "--host"
+      - "mongo"
+      - "/mnt/shock.mongodump"
+    depends_on: [ "mongo" ]
+  mongo:
+    image: mongo:2
+    ports:
+      - "27017:27017"
+secrets:
+  auth_data:
+    file: ./secrets/auth_data
+  auth_template:
+    file: ./secrets/auth_template
